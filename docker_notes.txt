@@ -1,0 +1,455 @@
+It works on my machine problem:
+
+- management tools
+- different configuration
+- hardware dependencies
+
+PREVIOUS SOLUTIONS:
+
+ - Configuration management tools: Require knowledge about hardware and OS
+ - Virtual machines
+
+Docker uses images and containers to allow apps to run anywhere, consistently!
+
+Images are created from configuration files 'Dockerfile' that describe everything your app needs to run 
+
+Docker images are compressed layers of other images (intermediate images).
+
+------------------------------------------------------------------------------------------------------
+
+Container vs Virtual Machine (remember the diagram of both)
+
+- Virtual Machine:
+
+	- Virtualize hardware
+	- Run on top of hypervisors 
+	- Need hardware emulation
+	- Require OS configuration
+	- Can run many apps at once
+	- Can't interact with host machine
+	- More secure but slower and heavy
+
+- Containers:
+
+	- Run in containers runtime
+	- Work alongside OS
+	- Do not require OS configuration
+	- Run one app at a time (usually)
+	- Can interact with the host
+	- Less secure, but faster and lighter
+
+------------------------------------------------------------------------------------------------------
+
+The anatomy of a container
+
+A CONTAINER is composed of two things:
+	
+- A Linux namespace: Allow administrator to restrict what processes can see on the system
+
+- A Linux control group: It limits resources that a container can use
+	- Monitor and restrict CPU usage
+	- Monitor and restrict networking and disk bandwidth
+	- Monitor and restrict memory consumption (this prevent one container from slowing down other containers) 
+
+Docker limitations
+ - Natively only runs on Linux
+ - Container images are bound to their parent operating systems
+	- Ex: containers created for images configured for Linux kernels can only run on Linux
+
+ - But nowadays there are workarounds for this limitations
+
+
+------------------------------------------------------------------------------------------------------
+
+Docker has three advantages
+
+- Dokerfiles make configuring and packaging apps and their environment really easy
+- The Docker Hub makes sharing images with anyone in the world easy.
+- The Docker CLI makes it really easy to start your apps in containers
+
+------------------------------------------------------------------------------------------------------
+
+Docker Alternatives
+
+- Podman - Created by RED HAT - Container runtime that emphasize more security
+	- supports rootless containers (container that cannot run as root super user, like docker containers do)
+
+------------------------------------------------------------------------------------------------------
+
+Docker Machine
+
+First solution to run Docker on Windows and Mac
+	- Create a small Virtual Machine (VirtualBox) that only runs the Docker Engine
+	- Problems:
+		- Slower than running on Linux
+		- Knowledge of VirtualBox when things went wrong
+
+Docker Desktop (2016) - Three improvements 
+	- Uses much smaller and more tightly integrated virtual machine
+	- Automatically handles volumes and networking port mapping 
+	- Come with really nice GUI
+
+
+------------------------------------------------------------------------------------------------------
+
+COMMANDS:
+
+docker run IMAGE_NAME = docker container create IMAGE_NAME + docker container start IMAGE_NAME + docker container attach IMAGE_NAME
+
+docker run -d --name=my-container -p 3000:3000 my-image
+
+	• -d flag (detached mode): the container runs not attached to the terminal.
+	• --name: give a name for the container
+	• -p OUTSIDE:INSIDE: Port binding. Binds the OUTSIDE Port (host machine) with the INSIDE Port (container)
+
+docker logs my-container => I can use this to see the container logs if we ran in detached mode (-d flag)
+
+docker build -t image-name .
+
+	-> Docker images are just layers of images compressed together. That is why in the "docker build" command we can see image ID's been printed on the terminal after each Dockerfile command.
+	-> Intermediate images: Docker creates an image for all the Dockerfile commands and after it finishes reading your Dockerfile, it squashes all of those images together into a single image.
+
+	• docker build --rm=true IMAGE_NAME (always remove intermediate containers, if the build succeeds)
+	• docker build --force-rm=true IMAGE_NAME (always remove intermediate containers, even if the build fails)
+	• docker build --no-cache (ignores caching, good to use when the previous build has failed)
+
+docker search IMAGE_TO_SEARCH (search images with that name on docker hub)
+	• Ex: docker search --filter is-official=true python (search officials python images)
+	• Ex: docker search --filter stars=100 python (search python images with 100 stars minimal)
+	• Ex: docker search --filter is-automated=true python (search automated python images)
+
+docker image pull IMAGE_NAME (pull the chosen image from Docker Hub to your local machine)
+
+docker image ls OR docker images (list images)
+	• docker image ls --all (list all images - intermediate images)
+	• docker image ls --no-truc (list images with output not truncated)
+	• docker image ls --quiet (list images ids only)
+	• docker image ls --filter dangling=true (filter intermediate images)
+	
+docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]
+
+docker exec CONTAINER_ID COMANDS
+
+	• docker exec --interactive --tty CONTAINER_ID bach (our terminal interacts with the container's terminal)
+	• docker exect -it CONTAINER_ID bach => same as above
+	• Ex: if I got a postgres:15 image and I want to see the tables inside the my_db database, I can run the command:
+docker exec -it postgres:15 psql -U diogo -d my_db -p 5432. So the command I'm running is: psql -U diogo -d my_db -p 5432
+
+docker stop: This command might take a while to stop a container depending on the application. So we can use the following command to immediately stop the container:
+	- docker stop -t 0. But be careful with this because it can lead to data loss
+
+
+DOCKER COMMANDS TRICKS:
+ - docker ps -a : Show all containers
+ - docker ps -aq OR docker ps -a -q : Show all containers ids
+ - docker rm -f : removes containers even those that are currently running. Using just the common 'docker rm' won't do this.
+
+ - HOW TO REMOVE ALL OF MY CONTAINERS USING A SINGLE COMMAND?
+	- We use the 'xargs' (built in Linux/Unix command used to capture output from one command and convert it into arguments for another command)
+	- docker ps -aq | xargs docker rm
+	
+	- On Windows we use on PowerShell: 
+	- docker ps -aq | ForEach-Object { docker rm $_ }
+	- docker rm $(docker ps -aq)
+
+ - WHAT ABOUT FOR REMOVING IMAGES?
+	- docker images -q | xargs docker rm (Linux/Mac)
+	- docker images -q | ForEach { docker rm $_ } (Windows)
+
+ - REMOVING UNNECESSARY SPACE: 
+	- Used to reclaim disk space by removing unused Docker Objects (smartly removes useless data)
+		• docker system prune
+		• Volumes are not prune by default, so I must add: docker system prune --volumes
+	- See how much space is currently being used by different Docker resources before cleaning them
+		• docker system df
+
+	OBS: Run 'docker system df' before running 'docker system prune' as a safety check
+
+
+ COMMANDS TO HELP YOU TROUBLESHOOT SLOW CONTAINERS
+
+	• docker stats
+		- Gives a snapshot of your container's performance as it's running
+	• docker top
+		- It shows you what's running inside of the container without having to exec into it
+	• docker inspect
+		- It can show you advanced information about a container that's running in JSON format
+		- Convenient for scripting against Docker
+		- Note: You can inspect your image using the Vs Code extension "Container Tools". Right click on the image then on the inspect button.
+	
+
+------------------------------------------------------------------------------------------------------
+
+SAVING DATA FROM CONTAINERS (DOCKER VOLUMES AND MOUNT BINDS)
+
+Every thing you create within a container stays within a container. Once the container stops, its data gets deleted with it.
+
+How can we work around this problem?
+R: Using volumes mounting features
+
+Using -v flag to map files in our computers to files in the container:
+	• -v OUTSIDE:INSIDE
+	• Ex: docker run --rm --entrypoint sh -v /tmp/container:/tmp ubuntu -c "echo 'Hello there.' > /tmp/file && cat"
+ /tmp/file
+
+	OBS: If we try to map a file on our computer to the container that doesn't exist. It will be mapped as a directory.
+	Example (consider the following commands):
+		• docker run --rm --entrypoint sh -v /tmp/this_file_does_not_exist:/tmp/file ubuntu -c "echo 'Hello there.' > /tmp/file && cat /tmp/file".
+			→ Output: cannot create /tmp/file: Is a directory
+			→ If we run now: cat /tmp/this_file_does_not_exist
+				→ We get: cat: /tmp/this_file_does_not_exist: Is a directory
+				→ This mean that Docker created a directory (because the file didn't exist) and mounted it as a directory before it ran the actual command
+
+	Example 2 (mapping existing file):
+		• touch /tmp/change_this_file
+		• docker run --rm --entrypoint sh -v /tmp/change_this_file:/tmp/file ubuntu -c "echo 'Hello there.' > /tmp/file && cat /tmp/file"
+			→ Output: Hello there.
+			→ If we run now: cat /tmp/change_this_file
+				→ We get: Hello there. (the file has been modified)
+
+DOCKER VOLUMES
+
+- While both can be used to share data between the host machine and a container, they work differently and have different use cases.
+
+DOCKER VOLUMES:
+- Is a type of data storage provided by Docker
+- A volume is a directory on the host machine that is accessible to a container
+- The data inside the volume is not stored in the container's file system, but on the host machine's file system. This mean that the data in a volume persists even if the container is deleted or recreated.  
+
+- docker volume create VOLUME_NAME (you can create a volume using this command)
+- docker volume ls (list volumes)
+- docker volume inspect
+
+BIND MOUNTS
+ - The key difference is not where them are stored (both stays on host machine), but who manages the area where they are stored.
+	• On bind mount: The user is responsible for it: -v /path/on/host:/path/on/container
+	• On volumes: The Docker is responsible for it: -v ${VOLUME_NAME}:/path/on/container
+
+- Bind mount is very useful for Hot Reload Development
+
+Analogy: Imagine that your HD is a warehouse
+
+- Bind Mount: It is as if you rented a specific spot on a shelf right at the entrance. You (the user) decide where it stays, you organize it, and you clean it. Docker only has permission to put things in and take things out of there. If you move the shelf to another place in the warehouse, Docker gets lost.
+
+- Volume: Docker says: "Leave it to me, I have a locked room in the back that only I organize." You don't need to know where the room is or what the shelf number is. You just ask Docker: "Save this in the volume 'my_database'" and it handles the rest.
+------------------------------------------------------------------------------------------------------
+
+IMAGE REGISTRY
+
+Docker Hub is the default registry used by the Docker Client. This is a publish accessible registry that anyone can push images to.
+
+PUSHING AN IMAGE TO MY REGISTRY:
+ - docker tag my-app $DOCKER_HUB_USERNAME/my-app:v1
+ Ex: docker tag our-web-server diogouser/our-web-server:0.0.1 
+     docker push diogouser/our-web-server:0.0.1
+
+OTHER POPULAR REGISTRIES:
+- GitHub Container Registry
+- GitLab Container Registry (https://docs.gitlab.com/user/packages/container_registry)
+- Artefact Registry (Google Cloud)
+- Elastic Container Registry (AWS)
+- Azure Container Registry
+- Oracle Container Registry
+- IBM Container Registry
+- ...
+
+PRIVATE IMAGE REGISTRIES 
+
+ - Can be self-hosted, provide security, fewer latency and other useful features for enterprise environments
+ - JFrog Artifactory, Sonatype Nexus, Red Hat Quay and Project Harbor are popular examples.
+ - All cloud providers offer registry services as well.
+
+------------------------------------------------------------------------------------------------------
+
+Buildkit: docker buildx
+
+Docker Desktop releases after 2023 or so, already uses Buildkit as default.
+
+But using the commando: docker buildx -t image-name . => gives you more options with what you can do with images
+
+Learn more about: https://docs.docker.com/build/buildkit
+
+------------------------------------------------------------------------------------------------------
+
+ Docker Context:
+
+	- Context enable you to create shortcuts that configure the machine that the Docker Client uses to do Docker-related things.
+	- These enable you to build and run container remotely, which is commonly used in an automated scenario like a CI/CD pipeline.
+
+	- Commands:
+		• docker context ls (list existing context)
+		• docker context use CONTEXT_NAME (switch to different context)
+
+
+	Note: context and endpoints can be overridden with shell environment variables: $DOCKER_CONTEXT (context) $DOCKER_HOST (endpoint).
+
+------------------------------------------------------------------------------------------------------
+TAGGING AND LABELING IMAGES
+	- Tags and Labels are used to organize your image
+
+	TAGS: Used to identity distinct versions of your image. It's common practice to use tags to mark each release
+		• docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]
+		• docker tag my-app:v1 ${DOCKERHUB_USER}/my-app:v1
+
+	LABELS: use the LABEL instruction in your Dockerfile to keep your image organized. This allows you to add metadata to an image using key value pairs.
+		• docker images ls --filter label="description=my description here" (you can filter images by their labels, but not by their tags)
+
+------------------------------------------------------------------------------------------------------
+
+Docker Best Practices: 
+	- Use Verified Images (more secure)
+	- Use container image scanner if using an unverified image (Clair, Trivy, Dagda: open source image scanners)
+	- Avoid tagging as latest
+		• you don't know the version of the app you're downloading
+		• The app's version can change when you run 'docker pull' later
+		• 'latest' can be overridden, making rollback difficult
+	- Use Non-root Users: it makes containers more secure (docker run --user somebody-else)
+
+
+------------------------------------------------------------------------------------------------------
+
+Kubernetes is a popular container orchestrator capable of managing very large numbers of containers
+
+	- It uses a distributed architecture to run and connect hundreds of thousands of containers with minimal hardware
+	- It make grouping, scaling, and connecting containers with the outside world really easy
+	- Load balancing and securing container traffic to/from the outside world are much easier with Kubernetes.
+
+------------------------------------------------------------------------------------------------------
+
+DOCKER COMPOSE
+
+
+Configuration as code: A file (docker-compose.yaml) that contains all of the settings that allow a system to run
+ - Version control
+ - Self-documenting 
+ - Easy management
+ - Docker compose is a Declarative Configuration Tool that allow you to specify the desired end result only and abstract out the steps to achieve that result.
+
+Docker Compose was designed for:
+ - Local development (non-production environments only)
+ - Staging server
+ - Continuous integration testing environment
+
+Not designed for:
+ - Distributed systems
+ - Complex production environment
+ - For these kind of production problems, like scaling and etc. An orchestration tool is a better suit.
+
+
+Commands:
+ - docker-compose up = docker-compose build && docker-compose create && docker-compose start
+	- Build the images
+	- Create the containers
+	- Start the application
+
+ - docker-compose down
+	- Stops all containers
+	- Delete all containers and images
+	- Removes all artifacts
+
+ - docker-compose stop
+	- Saves battery 
+	- Free up memory
+	- Less aggressive that docker-compose down. However, docker-compose down is more helpful if you've made changes to the running application
+
+ - docker-compose restart 
+	- Stop and Start all running containers
+	- docker-compose restart = docker-compose stop + docker-compose start
+
+
+
+Environment Variable vs Build Arguments:
+ - Environment Variables: Accessible inside the running container only
+	- Example 1:
+		- environment:
+		    - runtime_env=dev
+	- Example 2:
+		- services:
+		    database:
+		      image: "mysql"
+		      env_file: 
+		        - ./.env
+ - Build Arguments: Type of environment variable that are available to Docker at build time only, but not inside the running container
+	- Build tool Versions
+	- Cloud platform configuration
+	- Example: AWS region
+		- build:
+		    context:
+		    args:
+		      - region=us-east-1
+
+
+
+
+Volumes:
+ - If a Docker Compose volume configuration does not specify a source, compose will create a source volume automatically every time docker-compose up runs.
+ - Example 1 (without source): 
+	- volumes:
+	    - var/lib/MySQL
+ - Example 2 (with source): 
+	- volumes:
+	    - ./mysql:var/lib/MySQL
+
+ - We can use Access Mode on the volume as well (SOURCE:TARGET:ACCESS_MODE)
+	- rw: read write
+	- ro: read only
+
+- Very important to use named volumes:
+	- Without names, docker creates a volume every time docker-compose up runs. This silently takes a lot of space on the host machine unnecessarily.
+	- However, with named volumes, it prevents Docker from creating a new volume for each run, which will take up extra memory on the host machine.
+- Example 3 (with named volumes): 
+	- volumes:
+	    - my_volume:var/lib/MySQL
+
+
+
+Enforcing start-up order
+
+ - Using the 'depends_on'
+
+ - The 'depends_on' configuration can only guarantee that a dependency has been started by Docker Compose, not that it is available or healthy.
+
+
+
+
+Named subsets of services
+ - Service profiles allow you to organize Docker services into one or more categories for easy start-up.
+ - Service profiles allow you to specify which groups of containers to start and stop or establish a default group.
+ - Example:
+	- profile:
+	    - front_end_services
+
+ - command: docker-compose --profile front_end_services up/down/stop/restart
+
+
+
+Multiple compose files
+
+
+
+Environment variables
+- An environment variable is set in three different places: Inline, .env files and on shell commands.
+
+ Which one takes precedence? Shell variables always override defaults.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
